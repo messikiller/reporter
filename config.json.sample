@@ -1,7 +1,16 @@
-[
-    {
-        "title": "blog",
-        "path": "/home/web/blog/storage/logs/laravel.log",
-        "emails": "messikiller@aliyun.com"
-    }
-]
+{
+    "mail": {
+        "from": "",
+        "host": "",
+        "port": 465,
+        "username": "",
+        "password": ""
+    },
+    "list": [
+        {
+            "title": "",
+            "path": "",
+            "emails": ""
+        }
+    ]
+}
