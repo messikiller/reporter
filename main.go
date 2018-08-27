@@ -2,6 +2,7 @@ package main
 
 import (
     "os"
+    "flag"
     "io/ioutil"
     "encoding/json"
     "crypto/tls"
@@ -94,8 +95,12 @@ func watch(filename string, to string, subject string, m configMail) {
 }
 
 func main() {
+    configPath := flag.String("c", "/etc/reporter.json", "config.json file path")
+
+    flag.Parse()
+
     r := config{}
-    readJson("./config.json", &r)
+    readJson(*configPath, &r)
 
     for _, v := range r.List {
         go watch(v.Path, v.Emails, "【" + v.Title + "】" + " Exception Found", r.Mail)
