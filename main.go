@@ -1,6 +1,8 @@
 package main
 
 import (
+    "log"
+    "time"
     "os"
     "flag"
     "io/ioutil"
@@ -64,31 +66,91 @@ func mail(mail configMail, to string, subject string, body string) {
     }
 }
 
-func watch(filename string, to string, subject string, m configMail) {
-    watcher, _ := fsnotify.NewWatcher();
-    defer watcher.Close();
+func isFileExists(filename string) bool {
+    _, err := os.Stat(filename)
 
-    watcher.Add(filename);
+    if (err == nil || !os.IsNotExist(err)) {
+        return true
+    } else {
+        return false
+    }
+}
 
-    f, _ := os.Open(filename)
-    size, _ := f.Seek(0, os.SEEK_END)
+func waitIfNotExists(filename string) {
+    duration := 250 * time.Millisecond
+    for {
+		if isFileExists(filename) {
+            return
+        }
+
+		select {
+		case <-time.After(duration):
+		}
+	}
+}
+
+func watch(v configListItem, m configMail) {
+    waitIfNotExists(v.Path)
+
+    watcher, _ := fsnotify.NewWatcher()
+    defer watcher.Close()
+
+    watcher.Add(v.Path)
+
+    f, _ := os.Open(v.Path)
+    originStat, _ := os.Stat(v.Path)
+    originSize := originStat.Size()
+    f.Close()
 
     for {
         select {
         case ev := <-watcher.Events:
+            if ev.Op & fsnotify.Remove == fsnotify.Remove {
+                log.Println("File removed: ", ev.Name)
+
+                watcher.Close()
+                waitIfNotExists(ev.Name)
+                watcher, _ = fsnotify.NewWatcher()
+                watcher.Add(ev.Name)
+
+                st, _ := os.Stat(v.Path)
+                originSize = st.Size()
+
+                if originSize > 0 {
+                    buffer := make([]byte, originSize)
+
+                    f, _ = os.Open(v.Path)
+                    f.ReadAt(buffer, 0)
+                    f.Close()
+
+                    to := v.Emails
+                    subject := v.Title
+                    body := "<pre>" + string(buffer) + "</pre>"
+
+                    go mail(m, to, subject, body)
+                }
+            }
+
             if ev.Op & fsnotify.Write == fsnotify.Write {
-                stat, _ := os.Stat(filename)
+                stat, _ := os.Stat(v.Path)
                 newSize := stat.Size()
 
-                bufferSize := newSize - size
-                buffer := make([]byte, bufferSize)
-                f.ReadAt(buffer, size)
+                if newSize > originSize {
+                    bufferSize := newSize - originSize
+                    buffer := make([]byte, bufferSize)
 
-                size = newSize
+                    f, _ = os.Open(v.Path)
+                    f.ReadAt(buffer, originSize)
+                    f.Close()
 
-                body := "<pre>" + string(buffer) + "</pre>"
+                    originSize = newSize
 
-                go mail(m, to, subject, body)
+                    to := v.Emails
+                    subject := v.Title
+                    body := "<pre>" + string(buffer) + "</pre>"
+
+                    go mail(m, to, subject, body)
+                }
             }
         }
     }
@@ -103,9 +165,9 @@ func main() {
     readJson(*configPath, &r)
 
     for _, v := range r.List {
-        go watch(v.Path, v.Emails, "【" + v.Title + "】" + " Exception Found", r.Mail)
+        go watch(v, r.Mail)
     }
 
-    ch := make(chan bool)
-    <-ch
+    done := make(chan bool)
+    <-done
 }
