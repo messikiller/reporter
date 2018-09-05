@@ -124,7 +124,7 @@ func watch(v configListItem, m configMail) {
                     f.Close()
 
                     to := v.Emails
-                    subject := v.Title
+                    subject := "【" + v.Title + "】 Exception Found"
                     body := "<pre>" + string(buffer) + "</pre>"
 
                     go mail(m, to, subject, body)
@@ -146,7 +146,7 @@ func watch(v configListItem, m configMail) {
                     originSize = newSize
 
                     to := v.Emails
-                    subject := v.Title
+                    subject := "【" + v.Title + "】 Exception Found"
                     body := "<pre>" + string(buffer) + "</pre>"
 
                     go mail(m, to, subject, body)
